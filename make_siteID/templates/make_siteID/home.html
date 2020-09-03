@@ -1,0 +1,44 @@
+{% extends  'make_siteID/base.html' %}
+{% block content %}
+    <section class="section">
+        <div class="container">
+            <div class="columns">
+                <div class="column is-offset-4 is-4">
+                    <div class="rectangle">
+                        <article class="media">
+                            <div class="media-content">
+                                <div class="content">
+
+                                    <h5><strong>the userID for the account you wish to work on...</strong></h5>
+
+                                    <!-- Error message -->
+                                    {% if error %}
+                                    <div class="notification is-danger">
+                                        <p><strong>{{ error.description }}</strong></p>
+                                    </div>
+                                    {% endif %}
+
+                                    <form method="POST">
+                                        {% csrf_token %}
+                                        <div class="field has-addons">
+                                                <div class="control is-expanded">
+                                                    {{ form.userID }}
+                                                </div>
+                                                <div class="control">
+                                                <button class="button is-primary">
+                                                    Submit
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+{% endblock %}
+    

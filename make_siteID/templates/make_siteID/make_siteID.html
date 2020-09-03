@@ -1,0 +1,240 @@
+{% extends  'make_siteID/base.html' %}
+{% load static %}
+{% block content %}
+
+        <div class="columns is-centered">
+            <div class="column has-text-centered">
+            <!-- AppAccount Headers -->
+            <section class="section">
+                <div class="container">
+                    <!-- Error notification -->
+                    {% if error %}
+                    <div class="notification is-danger">
+                        <h1 class="title is-4">Error!</h1>
+                        <p><strong>{{ error.description }}</strong></p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Notification notification -->
+                    <div id='notification_container' style="display: none;">
+                    </div>
+
+                    <!-- Template Download Link -->
+                    <div id="template_downloader">
+                        <button class="button is-medium"><a href="{% url 'globalID_template' %}">Download Template</a></button>
+                    </div>
+
+                    <h1 class="title is-4">Name: {{ publisher_data.companyName }}</h1>
+                    <h2 class="subtitle is-4">Email: {{ publisher_data.publisherEmail }}</h2>
+                    <h2 id="userID" class="subtitle is-4">{{ publisher_data.userID }}</h2>
+
+                    <h3><strong>NOTE: </strong>Soju will accept a maximum of 100 globalIDs per job</h3>
+                </div>
+            </section>
+            
+            <div class="columns is-centered">
+                <!-- Domain Crawl Form -->
+                <div class="column is-one-quarter">
+                    <div class="rectangle"> 
+                        <form method="post" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <input id="crawl_file" type="file" class="input is-info" name="excel_crawl_data">
+                            <p id="crawl_button" class="button is-info">Get Domain Descriptions</p>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Creation form -->
+                <div class="column is-one-quarter">
+                    <div class="rectangle"> 
+                        <form method="post" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <input id="creation_file" type="file" class="input is-info" name="excel_create_data">
+                            <p id="create_button" class="button is-primary ">Create Global IDs</p>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- csv Response Download Link -->
+            <div class="columns is-centered">
+                <div id="csv_response_downloader" style="display: none;">
+                    <p id="csv_download" class="button is-info">Response as CSV</p>
+                </div>
+            </div>
+
+            <!-- Appending all Result data to the template -->
+                <div id="response_container" class="container" style="display: none;">
+                    <div class="table-container">
+                        <table class="table is-bordered" style="margin: 0 auto;">
+                            <tbody id="response_table_body">
+                                <!-- AJAX response goes here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- AJAX POST -->
+        <script>
+
+            $(document).ready(function() {
+
+                const userID_element = $('#userID').get(0);
+                const userID = userID_element.innerText;
+                const csrf_element = $('input[name = csrfmiddlewaretoken]');
+                const csrf_token = csrf_element.val();
+                let response_data;
+
+                $('#crawl_button,#create_button').click(function() {
+
+                    let formData = new FormData()
+                    formData.append("csrfmiddlewaretoken", csrf_token);
+
+                    if ($("#crawl_file").val()) {
+                        let input = $('#crawl_file').get(0);
+                        let files = input.files[0];
+                        formData.append("excel_crawl_data", files)
+                        $("#crawl_file").val("");
+
+                        let success_container = $('#notification_container');
+                        success_container.removeClass();
+                        success_container.empty();
+                        success_container.addClass("notification is-info");
+                        success_container.fadeIn('slow').css({'display': 'inline-block'});
+                        success_container.append('<h1 class="title is-4">Form succesfully submitted</h1>');
+                    }
+                    else if ($("#creation_file").val()) {
+                        let input = $('#creation_file').get(0);
+                        let files = input.files[0];
+                        formData.append("excel_create_data", files)
+                        $("#creation_file").val("");
+
+                        let success_container = $('#notification_container');
+                        success_container.removeClass();
+                        success_container.empty();
+                        success_container.addClass("notification is-info");
+                        success_container.fadeIn('slow').css({'display': 'inline-block'});
+                        success_container.append('<h1 class="title is-4">Form succesfully submitted<b> Note:</b> Additional time will be used to verify siteID registration in Viper2</b></h1>');
+                    }
+                    
+                    $.ajax({
+                        type: "POST",
+                        url: userID,
+                        dataType: "json",
+                        processData: false,
+                        contentType: false,
+                        cache: false,
+                        enctype: 'multipart/form-data',
+                        data: formData,
+                        success: function(data) {
+
+                            if (data.meta_data_list || data.creation_list) {
+                                let success_container = $('#notification_container');
+                                success_container.removeClass();
+                                success_container.empty();
+                                success_container.addClass("notification is-success");
+                                success_container.css({'display': 'inline-block'});
+                                success_container.append('<h1 class="title is-4">Success!</h1>');
+
+                                let response_container = $('#response_container');
+                                response_container.css({'display': 'inline-block'});
+                                let table_body = $('#response_table_body');
+                                table_body.empty();
+                                
+                                if (data.meta_data_list) {
+
+                                    for (let obj of data.meta_data_list) {
+                                        table_body.append('<tr><th>' + obj.domain + '</th><td>' + obj.description + '</td></tr>')
+                                    }
+                                }
+                                else {
+                                    response_data = data.creation_list;
+
+                                    // loading in the optional csv response downloader
+                                    let csv_response = $('#csv_response_downloader');
+                                    csv_response.fadeIn('slow').css({'display': 'inline-block'});
+
+                                    for (let obj of data.creation_list) {
+                                        table_body.append('<tr><th>' + obj.domain + '</th><td>' + obj.siteID + '</td></tr>')
+                                    }
+                                }
+                            }
+
+                            else if (data.error) {
+                                $("#response_table_body").empty();
+                                let error_container = $('#notification_container');
+                                error_container.removeClass();
+                                error_container.empty();
+                                error_container.addClass("notification is-danger");
+                                error_container.css({'display': 'inline-block'});
+                                error_container.append('<h1 class="title is-4">Error!</h1><p><strong>' + data.error + '</strong></p>')
+                            }
+
+                            
+                        },
+                        // ERROR when we fail to retrieve a response
+                        error: function() {
+                            $("#response_table_body").empty();
+                            let error_message = "Failed to receive a response from the server";
+                            let error_container = $('#notification_container');
+                            error_container.removeClass();
+                            error_container.empty();
+                            error_container.addClass("notification is-danger");
+                            error_container.css({'display': 'inline-block'});
+                            error_container.append('<h1 class="title is-4">Error!</h1><p><strong>' + error_message + '</strong></p>')
+                        }
+                    });
+                });
+
+                $("#csv_download").click(function() {
+                let rows = [];
+                let all_globalIDs = [];
+                response_data.forEach(function (object) {
+                    column = [];
+                    column.push(object['domain']);
+                    column.push(object['siteID']);
+                    rows.push(column);
+
+                    let siteID = object['siteID'];
+                    all_globalIDs.push(' '+ siteID.toString())
+                });
+
+                final_row = ['All SiteIDs']
+                final_row.push('"' + all_globalIDs.join(',') + '"')
+                console.log(final_row);
+                rows.push(final_row);
+                let csvContent = "Domain,SiteID\r\n";
+
+                rows.forEach(function(rowArray) {
+                    let row = rowArray.join(",");
+                    csvContent += row + "\r\n";
+                });
+
+                var downloadLink = document.createElement("a");
+                var blob = new Blob(["\ufeff", csvContent]);
+                var url = URL.createObjectURL(blob);
+                downloadLink.href = url;
+                downloadLink.download = "created_globalIDs.csv";
+
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                });
+            });
+        </script> -->
+
+
+        <script>
+            let crawl_input = document.getElementById("crawl_file");
+            let creation_input = document.getElementById("creation_file");
+
+            crawl_input.addEventListener("input", function() {
+                creation_input.value = "";
+            });
+
+            creation_input.addEventListener("input", function() {
+                crawl_input.value = "";
+            });
+        </script>
+{% endblock %}
